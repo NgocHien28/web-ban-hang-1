@@ -7,117 +7,70 @@ $baseProducts = [
         "category" => "Laptop",
         "base_price" => 15000000,
         "description" =>
-        "Laptop hiện đại, phù hợp cho học tập và làm việc.",
-        "image_keyword" =>
-        "laptop,computer,technology,device"
+        "Laptop hiện đại, hiệu năng tốt, phù hợp cho học tập và làm việc.",
+
+        "image" =>
+        "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=800&q=80"
     ],
 
     [
-        "name" => "Smartphone",
+        "name" => "Điện thoại",
         "category" => "Điện thoại",
         "base_price" => 8000000,
         "description" =>
-        "Điện thoại thông minh với thiết kế hiện đại.",
-        "image_keyword" =>
-        "smartphone,mobilephone,technology,device"
-    ],
+        "Điện thoại thông minh với thiết kế hiện đại và nhiều tính năng tiện ích.",
 
-    [
-        "name" => "Tai nghe",
-        "category" => "Âm thanh",
-        "base_price" => 1200000,
-        "description" =>
-        "Tai nghe không dây với chất lượng âm thanh tốt.",
-        "image_keyword" =>
-        "headphones,electronics,technology"
-    ],
-
-    [
-        "name" => "Bàn phím",
-        "category" => "Phụ kiện",
-        "base_price" => 900000,
-        "description" =>
-        "Bàn phím hiện đại, phù hợp cho công việc và giải trí.",
-        "image_keyword" =>
-        "computerkeyboard,keyboard,electronics"
-    ],
-
-    [
-        "name" => "Chuột",
-        "category" => "Phụ kiện",
-        "base_price" => 500000,
-        "description" =>
-        "Chuột không dây nhỏ gọn và tiện lợi.",
-        "image_keyword" =>
-        "computermouse,mouse,electronics"
-    ],
-
-    [
-        "name" => "Màn hình",
-        "category" => "Màn hình",
-        "base_price" => 4500000,
-        "description" =>
-        "Màn hình sắc nét, phù hợp cho công việc và giải trí.",
-        "image_keyword" =>
-        "computermonitor,monitor,display,technology"
-    ],
-
-    [
-        "name" => "Loa Bluetooth",
-        "category" => "Âm thanh",
-        "base_price" => 1500000,
-        "description" =>
-        "Loa Bluetooth nhỏ gọn với âm thanh sống động.",
-        "image_keyword" =>
-        "bluetoothspeaker,speaker,electronics"
-    ],
-
-    [
-        "name" => "Webcam",
-        "category" => "Phụ kiện",
-        "base_price" => 1300000,
-        "description" =>
-        "Webcam chất lượng cao dành cho họp trực tuyến.",
-        "image_keyword" =>
-        "webcam,camera,electronics"
+        "image" =>
+        "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80"
     ],
 
     [
         "name" => "Tablet",
-        "category" => "Máy tính bảng",
+        "category" => "Tablet",
         "base_price" => 7000000,
         "description" =>
-        "Máy tính bảng tiện lợi cho học tập và giải trí.",
-        "image_keyword" =>
-        "tabletcomputer,tablet,technology,device"
+        "Máy tính bảng tiện lợi, phù hợp cho học tập, làm việc và giải trí.",
+
+        "image" =>
+        "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?auto=format&fit=crop&w=800&q=80"
     ],
 
     [
-        "name" => "Đồng hồ thông minh",
-        "category" => "Thiết bị đeo",
-        "base_price" => 3000000,
+        "name" => "Tai nghe",
+        "category" => "Tai nghe",
+        "base_price" => 1200000,
         "description" =>
-        "Đồng hồ thông minh theo dõi hoạt động hàng ngày.",
-        "image_keyword" =>
-        "smartwatch,digitalwatch,technology,device"
+        "Tai nghe không dây với chất lượng âm thanh tốt và thiết kế hiện đại.",
+
+        "image" =>
+        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=800&q=80"
     ]
 
 ];
 
+
+// =========================
+// Khởi tạo mảng sản phẩm
+// =========================
 
 $products = [];
 
 $id = 1;
 
 
-// =====================================
+// =========================
 // Tạo 100 sản phẩm
-// 10 loại sản phẩm x 10 phiên bản
-// =====================================
+//
+// 4 loại sản phẩm
+// x
+// 25 phiên bản
+//
+// = 100 sản phẩm
+// =========================
 
 for (
     $version = 1;
-    $version <= 10;
+    $version <= 25;
     $version++
 ) {
 
@@ -128,19 +81,24 @@ for (
 
         $products[] = [
 
-            "id" => $id,
+            // ID sản phẩm
+            "id" =>
+            $id,
 
 
+            // Tên sản phẩm
             "name" =>
             $baseProduct["name"]
                 . " "
                 . $version,
 
 
+            // Danh mục
             "category" =>
             $baseProduct["category"],
 
 
+            // Giá sản phẩm
             "price" =>
             $baseProduct["base_price"]
                 +
@@ -151,19 +109,14 @@ for (
                 ),
 
 
+            // Mô tả
             "description" =>
             $baseProduct["description"],
 
 
-            // =============================
-            // Online product image
-            // =============================
-
+            // Hình ảnh online
             "image" =>
-            "https://loremflickr.com/600/400/"
-                . $baseProduct["image_keyword"]
-                . "?lock="
-                . $id
+            $baseProduct["image"]
 
         ];
 
@@ -172,5 +125,9 @@ for (
     }
 }
 
+
+// =========================
+// Trả về danh sách sản phẩm
+// =========================
 
 return $products;
