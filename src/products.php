@@ -26,9 +26,26 @@ if (!isset($_SESSION["cart"])) {
 // Load dữ liệu sản phẩm
 // =========================
 
-$allProducts =
-    require __DIR__
+$productsFile =
+    __DIR__
     . "/data/products_data.php";
+
+
+if (!file_exists($productsFile)) {
+
+    die("Không tìm thấy file dữ liệu sản phẩm: "
+        . htmlspecialchars($productsFile));
+}
+
+
+$allProducts =
+    require $productsFile;
+
+
+if (!is_array($allProducts)) {
+
+    die("File products_data.php phải trả về một mảng sản phẩm.");
+}
 
 
 // =========================
@@ -43,43 +60,101 @@ $search =
 
 
 $category =
-    $_GET["category"]
-    ?? "";
+    trim(
+        $_GET["category"]
+            ?? ""
+    );
 
 
 $minPrice =
     isset($_GET["min_price"])
     && $_GET["min_price"] !== ""
-    ? (int) $_GET["min_price"]
+    ? max(
+        0,
+        (int) $_GET["min_price"]
+    )
     : 0;
 
 
 $maxPrice =
     isset($_GET["max_price"])
     && $_GET["max_price"] !== ""
-    ? (int) $_GET["max_price"]
+    ? max(
+        0,
+        (int) $_GET["max_price"]
+    )
     : 0;
 
 
+// Nếu giá từ lớn hơn giá đến,
+// đổi vị trí hai giá trị
+
+if (
+    $minPrice > 0
+    &&
+    $maxPrice > 0
+    &&
+    $minPrice > $maxPrice
+) {
+
+    $temporaryPrice =
+        $minPrice;
+
+    $minPrice =
+        $maxPrice;
+
+    $maxPrice =
+        $temporaryPrice;
+}
+
+
 // =========================
-// Lấy danh sách Category
+// Lấy danh sách category
 // =========================
 
 $categories = [];
 
+$categoryCounts = [];
+
 
 foreach ($allProducts as $product) {
 
+    $productCategory =
+        (string) (
+            $product["category"]
+            ?? ""
+        );
+
+
+    if ($productCategory === "") {
+        continue;
+    }
+
+
     if (
         !in_array(
-            $product["category"],
-            $categories
+            $productCategory,
+            $categories,
+            true
         )
     ) {
 
         $categories[] =
-            $product["category"];
+            $productCategory;
     }
+
+
+    if (
+        !isset(
+            $categoryCounts[$productCategory]
+        )
+    ) {
+
+        $categoryCounts[$productCategory] = 0;
+    }
+
+
+    $categoryCounts[$productCategory]++;
 }
 
 
@@ -103,6 +178,75 @@ $filteredProducts =
             $maxPrice
         ) {
 
+            $productName =
+                (string) (
+                    $product["name"]
+                    ?? ""
+                );
+
+
+            $productDescription =
+                (string) (
+                    $product["description"]
+                    ?? ""
+                );
+
+
+            $productCategory =
+                (string) (
+                    $product["category"]
+                    ?? ""
+                );
+
+
+            $originalPrice =
+                (int) (
+                    $product["price"]
+                    ?? 0
+                );
+
+
+            $discount =
+                (int) (
+                    $product["discount"]
+                    ?? 0
+                );
+
+
+            // Giới hạn phần trăm giảm từ 0 đến 100
+
+            $discount =
+                max(
+                    0,
+                    min(
+                        100,
+                        $discount
+                    )
+                );
+
+
+            // Tính giá sau khuyến mãi
+
+            $productPrice =
+                $originalPrice;
+
+
+            if ($discount > 0) {
+
+                $productPrice =
+                    (int) round(
+                        $originalPrice
+                            -
+                            (
+                                $originalPrice
+                                *
+                                $discount
+                                /
+                                100
+                            )
+                    );
+            }
+
 
             // =========================
             // Search
@@ -110,17 +254,16 @@ $filteredProducts =
 
             if ($search !== "") {
 
-
                 $searchName =
                     stripos(
-                        $product["name"],
+                        $productName,
                         $search
                     ) !== false;
 
 
                 $searchDescription =
                     stripos(
-                        $product["description"],
+                        $productDescription,
                         $search
                     ) !== false;
 
@@ -143,8 +286,9 @@ $filteredProducts =
             if (
                 $category !== ""
                 &&
-                $product["category"]
-                !== $category
+                $productCategory
+                !==
+                $category
             ) {
 
                 return false;
@@ -158,8 +302,9 @@ $filteredProducts =
             if (
                 $minPrice > 0
                 &&
-                $product["price"]
-                < $minPrice
+                $productPrice
+                <
+                $minPrice
             ) {
 
                 return false;
@@ -173,8 +318,9 @@ $filteredProducts =
             if (
                 $maxPrice > 0
                 &&
-                $product["price"]
-                > $maxPrice
+                $productPrice
+                >
+                $maxPrice
             ) {
 
                 return false;
@@ -183,7 +329,6 @@ $filteredProducts =
 
             return true;
         }
-
     );
 
 
@@ -225,20 +370,14 @@ $currentPage =
     : 1;
 
 
-if ($currentPage < 1) {
-    $currentPage = 1;
-}
-
-
-if (
-    $currentPage
-    >
-    $totalPages
-) {
-
-    $currentPage =
-        $totalPages;
-}
+$currentPage =
+    max(
+        1,
+        min(
+            $currentPage,
+            $totalPages
+        )
+    );
 
 
 $offset =
@@ -268,7 +407,10 @@ foreach (
 ) {
 
     $cartCount +=
-        $item["quantity"];
+        (int) (
+            $item["quantity"]
+            ?? 0
+        );
 }
 
 
@@ -293,7 +435,6 @@ $baseQuery = [
     $maxPrice > 0
         ? $maxPrice
         : ""
-
 ];
 
 ?>
@@ -316,7 +457,7 @@ $baseQuery = [
 
     <link
         rel="stylesheet"
-        href="./css/products.css?v=10">
+        href="./css/products.css?v=11">
 
 </head>
 
@@ -334,13 +475,11 @@ $baseQuery = [
     </div>
 
 
-
     <!-- =========================
      Header
 ========================= -->
 
     <header class="header">
-
 
         <div class="header-container">
 
@@ -350,11 +489,8 @@ $baseQuery = [
             <a
                 href="products.php"
                 class="logo">
-
                 MyShop
-
             </a>
-
 
 
             <!-- Search -->
@@ -363,7 +499,6 @@ $baseQuery = [
                 class="header-search"
                 action="products.php"
                 method="get">
-
 
                 <input
                     type="text"
@@ -408,28 +543,23 @@ $baseQuery = [
                             ?>">
 
 
-                <button type="submit">
-
+                <button
+                    type="submit"
+                    aria-label="Tìm kiếm">
                     🔍
-
                 </button>
 
-
             </form>
-
 
 
             <!-- Navigation -->
 
             <nav class="nav">
 
-
                 <a
                     href="products.php"
                     class="active">
-
                     Sản phẩm
-
                 </a>
 
 
@@ -437,15 +567,10 @@ $baseQuery = [
 
                     Giỏ hàng
 
-
                     <span
                         class="cart-count"
                         id="cart-count">
-
-                        <?php
-                        echo $cartCount;
-                        ?>
-
+                        <?php echo $cartCount; ?>
                     </span>
 
                 </a>
@@ -454,20 +579,14 @@ $baseQuery = [
                 <a
                     href="logout.php"
                     class="logout">
-
                     Đăng xuất
-
                 </a>
-
 
             </nav>
 
-
         </div>
 
-
     </header>
-
 
 
     <!-- =========================
@@ -477,13 +596,11 @@ $baseQuery = [
     <div class="page-layout">
 
 
-
         <!-- =========================
-     Sidebar
-========================= -->
+         Sidebar
+    ========================= -->
 
         <aside class="sidebar">
-
 
             <form
                 action="products.php"
@@ -491,18 +608,12 @@ $baseQuery = [
                 class="sidebar-filter-form">
 
 
-
-                <!-- =========================
-     Category
-========================= -->
+                <!-- Category -->
 
                 <div class="sidebar-section">
 
-
                     <h3>
-
                         DANH MỤC
-
                     </h3>
 
 
@@ -519,12 +630,10 @@ $baseQuery = [
                                         : "";
                                     ?>">
 
-
                             <input
                                 type="radio"
                                 name="category"
                                 value=""
-
                                 <?php
                                 echo
                                 $category === ""
@@ -534,9 +643,7 @@ $baseQuery = [
 
 
                             <span>
-
                                 Tất cả sản phẩm
-
                             </span>
 
 
@@ -550,9 +657,7 @@ $baseQuery = [
 
                             </span>
 
-
                         </label>
-
 
 
                         <!-- Category List -->
@@ -564,30 +669,6 @@ $baseQuery = [
                         ):
                         ?>
 
-
-                            <?php
-
-                            $categoryCount = 0;
-
-
-                            foreach (
-                                $allProducts
-                                as $product
-                            ) {
-
-                                if (
-                                    $product["category"]
-                                    ===
-                                    $categoryItem
-                                ) {
-
-                                    $categoryCount++;
-                                }
-                            }
-
-                            ?>
-
-
                             <label
                                 class="<?php
                                         echo
@@ -598,17 +679,14 @@ $baseQuery = [
                                             : "";
                                         ?>">
 
-
                                 <input
                                     type="radio"
                                     name="category"
-
                                     value="<?php
                                             echo htmlspecialchars(
                                                 $categoryItem
                                             );
                                             ?>"
-
                                     <?php
                                     echo
                                     $category
@@ -633,58 +711,45 @@ $baseQuery = [
                                 <span class="category-count">
 
                                     <?php
-                                    echo $categoryCount;
+                                    echo
+                                    $categoryCounts[$categoryItem]
+                                        ?? 0;
                                     ?>
 
                                 </span>
 
-
                             </label>
-
 
                         <?php endforeach; ?>
 
-
                     </div>
-
 
                 </div>
 
 
-
-                <!-- =========================
-     Price Filter
-========================= -->
+                <!-- Price Filter -->
 
                 <div class="sidebar-section">
 
-
                     <h3>
-
                         KHOẢNG GIÁ
-
                     </h3>
 
 
                     <div class="price-fields">
 
-
                         <div>
 
-
-                            <label>
-
+                            <label for="min-price">
                                 Từ
-
                             </label>
-
 
                             <input
                                 type="number"
+                                id="min-price"
                                 name="min_price"
                                 min="0"
                                 placeholder="0"
-
                                 value="<?php
                                         echo
                                         $minPrice > 0
@@ -692,27 +757,21 @@ $baseQuery = [
                                             : "";
                                         ?>">
 
-
                         </div>
-
 
 
                         <div>
 
-
-                            <label>
-
+                            <label for="max-price">
                                 Đến
-
                             </label>
-
 
                             <input
                                 type="number"
+                                id="max-price"
                                 name="max_price"
                                 min="0"
                                 placeholder="50000000"
-
                                 value="<?php
                                         echo
                                         $maxPrice > 0
@@ -720,18 +779,14 @@ $baseQuery = [
                                             : "";
                                         ?>">
 
-
                         </div>
 
-
                     </div>
-
 
                 </div>
 
 
-
-                <!-- Giữ search khi filter sidebar -->
+                <!-- Giữ search khi filter -->
 
                 <input
                     type="hidden"
@@ -743,100 +798,69 @@ $baseQuery = [
                             ?>">
 
 
-
-                <!-- =========================
-     Filter Actions
-========================= -->
+                <!-- Filter Actions -->
 
                 <div class="sidebar-actions">
-
 
                     <button
                         type="submit"
                         class="apply-filter-button">
-
                         Áp dụng bộ lọc
-
                     </button>
 
 
                     <a
                         href="products.php"
                         class="clear-filter-button">
-
                         Xóa bộ lọc
-
                     </a>
-
 
                 </div>
 
-
             </form>
-
 
         </aside>
 
 
-
         <!-- =========================
-     Product Main
-========================= -->
+         Product Main
+    ========================= -->
 
         <main class="product-main">
 
 
-
-            <!-- =========================
-     Product Header
-========================= -->
+            <!-- Product Header -->
 
             <div class="product-list-header">
 
-
                 <div>
-
 
                     <h1>
 
-
                         <?php
 
-
                         if ($category !== "") {
-
 
                             echo htmlspecialchars(
                                 $category
                             );
                         } else {
 
-
                             echo "Tất cả sản phẩm";
                         }
 
-
                         ?>
-
 
                     </h1>
 
 
                     <p>
 
-
                         Hiển thị
-
 
                         <?php
 
-
-                        if (
-                            $totalProducts
-                            >
-                            0
-                        ) {
-
+                        if ($totalProducts > 0) {
 
                             echo ($offset + 1)
                                 .
@@ -846,54 +870,36 @@ $baseQuery = [
                                     $offset
                                         +
                                         $productsPerPage,
-
                                     $totalProducts
                                 );
                         } else {
 
-
                             echo "0";
                         }
 
-
                         ?>
-
 
                         của
 
-
-                        <?php
-                        echo $totalProducts;
-                        ?>
-
+                        <?php echo $totalProducts; ?>
 
                         sản phẩm
 
-
                     </p>
 
-
                 </div>
-
 
             </div>
 
 
-
-            <!-- =========================
-     Product Grid
-========================= -->
+            <!-- Product Grid -->
 
             <section class="product-grid">
 
 
-
                 <?php if (
-                    count(
-                        $products
-                    ) > 0
+                    count($products) > 0
                 ): ?>
-
 
 
                     <?php
@@ -904,151 +910,260 @@ $baseQuery = [
                     ?>
 
 
-                        <div
+                        <?php
+
+                        $productId =
+                            (int) (
+                                $product["id"]
+                                ?? 0
+                            );
+
+
+                        $productName =
+                            (string) (
+                                $product["name"]
+                                ?? "Sản phẩm"
+                            );
+
+
+                        $productCategory =
+                            (string) (
+                                $product["category"]
+                                ?? ""
+                            );
+
+
+                        $productDescription =
+                            (string) (
+                                $product["description"]
+                                ?? ""
+                            );
+
+
+                        $productImage =
+                            (string) (
+                                $product["image"]
+                                ?? ""
+                            );
+
+
+                        $originalPrice =
+                            (int) (
+                                $product["price"]
+                                ?? 0
+                            );
+
+
+                        $discount =
+                            (int) (
+                                $product["discount"]
+                                ?? 0
+                            );
+
+
+                        $discount =
+                            max(
+                                0,
+                                min(
+                                    100,
+                                    $discount
+                                )
+                            );
+
+
+                        $salePrice =
+                            $originalPrice;
+
+
+                        if ($discount > 0) {
+
+                            $salePrice =
+                                (int) round(
+                                    $originalPrice
+                                        -
+                                        (
+                                            $originalPrice
+                                            *
+                                            $discount
+                                            /
+                                            100
+                                        )
+                                );
+                        }
+
+                        ?>
+
+
+                        <article
                             class="product-card"
-
-                            onclick="
-        window.location.href =
-        'product_detail.php?id=<?php
-                                echo $product["id"];
-                                ?>'
-    ">
+                            tabindex="0"
+                            role="link"
+                            data-detail-url="product_detail.php?id=<?php
+                                                                    echo $productId;
+                                                                    ?>">
 
 
-
-                            <!-- =========================
-     Product Image
-========================= -->
+                            <!-- Product Image -->
 
                             <div class="product-image">
 
 
-                                <img
+                                <!-- Sale Badge -->
 
+                                <?php if ($discount > 0): ?>
+
+                                    <span class="sale-badge">
+
+                                        -<?php
+                                            echo $discount;
+                                            ?>%
+
+                                    </span>
+
+                                <?php endif; ?>
+
+
+                                <img
                                     src="<?php
                                             echo htmlspecialchars(
-                                                $product["image"]
+                                                $productImage
                                             );
                                             ?>"
-
                                     alt="<?php
                                             echo htmlspecialchars(
-                                                $product["name"]
+                                                $productName
                                             );
-                                            ?>">
-
+                                            ?>"
+                                    loading="lazy"
+                                    onerror="
+                                    this.onerror = null;
+                                    this.src =
+                                    'https://placehold.co/600x400/f3f4f6/64748b?text=Khong+co+hinh';
+                                ">
 
 
                                 <!-- Hover Overlay -->
 
                                 <div class="product-hover-overlay">
 
-
                                     <span>
-
                                         Xem chi tiết
-
                                     </span>
+
+                                </div>
+
+                            </div>
+
+
+                            <!-- Product Content -->
+
+                            <div class="product-content">
+
+
+                                <span class="product-category">
+
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $productCategory
+                                    );
+                                    ?>
+
+                                </span>
+
+
+                                <h2>
+
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $productName
+                                    );
+                                    ?>
+
+                                </h2>
+
+
+                                <p class="description">
+
+                                    <?php
+                                    echo htmlspecialchars(
+                                        $productDescription
+                                    );
+                                    ?>
+
+                                </p>
+
+
+                                <!-- Product Price -->
+
+                                <div class="product-price">
+
+
+                                    <?php if ($discount > 0): ?>
+
+
+                                        <p class="original-price">
+
+                                            <?php
+                                            echo number_format(
+                                                $originalPrice,
+                                                0,
+                                                ",",
+                                                "."
+                                            );
+                                            ?>
+
+                                            đ
+
+                                        </p>
+
+
+                                        <p class="sale-price">
+
+                                            <?php
+                                            echo number_format(
+                                                $salePrice,
+                                                0,
+                                                ",",
+                                                "."
+                                            );
+                                            ?>
+
+                                            đ
+
+                                        </p>
+
+
+                                    <?php else: ?>
+
+
+                                        <p class="normal-price">
+
+                                            <?php
+                                            echo number_format(
+                                                $originalPrice,
+                                                0,
+                                                ",",
+                                                "."
+                                            );
+                                            ?>
+
+                                            đ
+
+                                        </p>
+
+
+                                    <?php endif; ?>
 
 
                                 </div>
 
 
-                            </div>
-
-
-
-                            <!-- =========================
-     Product Content
-========================= -->
-
-                            <div class="product-content">
-
-
-
-                                <span class="product-category">
-
-
-                                    <?php
-                                    echo htmlspecialchars(
-                                        $product["category"]
-                                    );
-                                    ?>
-
-
-                                </span>
-
-
-
-                                <h2>
-
-
-                                    <?php
-                                    echo htmlspecialchars(
-                                        $product["name"]
-                                    );
-                                    ?>
-
-
-                                </h2>
-
-
-
-                                <p class="description">
-
-
-                                    <?php
-                                    echo htmlspecialchars(
-                                        $product["description"]
-                                    );
-                                    ?>
-
-
-                                </p>
-
-
-
-                                <p class="price">
-
-
-                                    <?php
-
-
-                                    echo number_format(
-
-                                        $product["price"],
-
-                                        0,
-
-                                        ",",
-
-                                        "."
-
-                                    );
-
-
-                                    ?>
-
-
-                                    đ
-
-
-                                </p>
-
-
-
-                                <!-- =========================
-     Add To Cart
-========================= -->
+                                <!-- Add To Cart -->
 
                                 <form
-
                                     class="add-to-cart-form"
-
-                                    onclick="
-        event.stopPropagation();
-    ">
-
+                                    action="cart.php"
+                                    method="post">
 
                                     <input
                                         type="hidden"
@@ -1060,7 +1175,7 @@ $baseQuery = [
                                         type="hidden"
                                         name="product_id"
                                         value="<?php
-                                                echo $product["id"];
+                                                echo $productId;
                                                 ?>">
 
 
@@ -1070,18 +1185,13 @@ $baseQuery = [
 
                                     </button>
 
-
                                 </form>
-
 
                             </div>
 
-
-                        </div>
-
+                        </article>
 
                     <?php endforeach; ?>
-
 
 
                 <?php else: ?>
@@ -1089,27 +1199,17 @@ $baseQuery = [
 
                     <div class="no-products">
 
-
                         <div class="no-products-icon">
-
                             🔍
-
                         </div>
 
-
                         <h2>
-
                             Không tìm thấy sản phẩm
-
                         </h2>
 
-
                         <p>
-
                             Vui lòng thử thay đổi điều kiện tìm kiếm hoặc bộ lọc.
-
                         </p>
-
 
                     </div>
 
@@ -1120,55 +1220,41 @@ $baseQuery = [
             </section>
 
 
+            <!-- Pagination -->
 
-            <!-- =========================
-     Pagination
-========================= -->
-
-            <?php if (
-                $totalPages > 1
-            ): ?>
+            <?php if ($totalPages > 1): ?>
 
 
-                <nav class="pagination">
-
+                <nav
+                    class="pagination"
+                    aria-label="Phân trang">
 
 
                     <!-- Previous -->
 
-                    <?php if (
-                        $currentPage > 1
-                    ): ?>
+                    <?php if ($currentPage > 1): ?>
 
 
                         <?php
 
-
                         $previousQuery =
                             $baseQuery;
 
-
                         $previousQuery["page"] =
                             $currentPage - 1;
-
 
                         ?>
 
 
                         <a
-
                             href="products.php?<?php
                                                 echo http_build_query(
                                                     $previousQuery
                                                 );
                                                 ?>"
-
                             class="pagination-nav"
-
                             title="Trang trước">
-
                             ‹
-
                         </a>
 
 
@@ -1177,18 +1263,14 @@ $baseQuery = [
 
                         <span
                             class="pagination-nav disabled">
-
                             ‹
-
                         </span>
 
 
                     <?php endif; ?>
 
 
-
                     <?php
-
 
                     $startPage =
                         max(
@@ -1203,28 +1285,20 @@ $baseQuery = [
                             $currentPage + 2
                         );
 
-
                     ?>
-
 
 
                     <!-- First Page -->
 
-                    <?php if (
-                        $startPage > 1
-                    ): ?>
+                    <?php if ($startPage > 1): ?>
 
 
                         <?php
 
-
                         $firstQuery =
                             $baseQuery;
 
-
-                        $firstQuery["page"] =
-                            1;
-
+                        $firstQuery["page"] = 1;
 
                         ?>
 
@@ -1235,23 +1309,15 @@ $baseQuery = [
                                                     $firstQuery
                                                 );
                                                 ?>">
-
                             1
-
                         </a>
 
 
-                        <?php if (
-                            $startPage > 2
-                        ): ?>
-
+                        <?php if ($startPage > 2): ?>
 
                             <span class="pagination-dots">
-
                                 ...
-
                             </span>
-
 
                         <?php endif; ?>
 
@@ -1259,40 +1325,31 @@ $baseQuery = [
                     <?php endif; ?>
 
 
-
-                    <!-- Page Number -->
+                    <!-- Page Numbers -->
 
                     <?php
 
-
                     for (
                         $page = $startPage;
-
                         $page <= $endPage;
-
                         $page++
                     ):
-
 
                         $pageQuery =
                             $baseQuery;
 
-
                         $pageQuery["page"] =
                             $page;
-
 
                     ?>
 
 
                         <a
-
                             href="products.php?<?php
                                                 echo http_build_query(
                                                     $pageQuery
                                                 );
                                                 ?>"
-
                             class="<?php
                                     echo
                                     $page
@@ -1302,17 +1359,12 @@ $baseQuery = [
                                         : "";
                                     ?>">
 
-
-                            <?php
-                            echo $page;
-                            ?>
-
+                            <?php echo $page; ?>
 
                         </a>
 
 
                     <?php endfor; ?>
-
 
 
                     <!-- Last Page -->
@@ -1330,27 +1382,20 @@ $baseQuery = [
                             $totalPages - 1
                         ): ?>
 
-
                             <span class="pagination-dots">
-
                                 ...
-
                             </span>
-
 
                         <?php endif; ?>
 
 
                         <?php
 
-
                         $lastQuery =
                             $baseQuery;
 
-
                         $lastQuery["page"] =
                             $totalPages;
-
 
                         ?>
 
@@ -1361,16 +1406,11 @@ $baseQuery = [
                                                     $lastQuery
                                                 );
                                                 ?>">
-
-                            <?php
-                            echo $totalPages;
-                            ?>
-
+                            <?php echo $totalPages; ?>
                         </a>
 
 
                     <?php endif; ?>
-
 
 
                     <!-- Next -->
@@ -1384,32 +1424,24 @@ $baseQuery = [
 
                         <?php
 
-
                         $nextQuery =
                             $baseQuery;
 
-
                         $nextQuery["page"] =
                             $currentPage + 1;
-
 
                         ?>
 
 
                         <a
-
                             href="products.php?<?php
                                                 echo http_build_query(
                                                     $nextQuery
                                                 );
                                                 ?>"
-
                             class="pagination-nav"
-
                             title="Trang sau">
-
                             ›
-
                         </a>
 
 
@@ -1418,9 +1450,7 @@ $baseQuery = [
 
                         <span
                             class="pagination-nav disabled">
-
                             ›
-
                         </span>
 
 
@@ -1435,9 +1465,7 @@ $baseQuery = [
 
         </main>
 
-
     </div>
-
 
 
     <!-- =========================
@@ -1462,29 +1490,95 @@ $baseQuery = [
 
 
         categoryInputs.forEach(
-
             function(categoryInput) {
 
-
                 categoryInput.addEventListener(
-
                     "change",
-
                     function() {
 
+                        if (sidebarFilterForm) {
 
-                        sidebarFilterForm.submit();
-
+                            sidebarFilterForm.submit();
+                        }
 
                     }
+                );
 
+            }
+        );
+
+
+        // =====================================
+        // PRODUCT CARD DETAIL
+        // =====================================
+
+        const productCards =
+            document.querySelectorAll(
+                ".product-card"
+            );
+
+
+        productCards.forEach(
+            function(card) {
+
+                card.addEventListener(
+                    "click",
+                    function(event) {
+
+                        const clickedForm =
+                            event.target.closest(
+                                ".add-to-cart-form"
+                            );
+
+
+                        if (clickedForm) {
+                            return;
+                        }
+
+
+                        const detailUrl =
+                            card.dataset.detailUrl;
+
+
+                        if (detailUrl) {
+
+                            window.location.href =
+                                detailUrl;
+                        }
+
+                    }
                 );
 
 
+                card.addEventListener(
+                    "keydown",
+                    function(event) {
+
+                        if (
+                            event.key === "Enter" ||
+                            event.key === " "
+                        ) {
+
+                            event.preventDefault();
+
+
+                            const detailUrl =
+                                card.dataset.detailUrl;
+
+
+                            if (detailUrl) {
+
+                                window.location.href =
+                                    detailUrl;
+                            }
+
+                        }
+
+                    }
+                );
+
             }
-
         );
-
 
 
         // =====================================
@@ -1503,7 +1597,7 @@ $baseQuery = [
             );
 
 
-        const cartCount =
+        const cartCountElement =
             document.getElementById(
                 "cart-count"
             );
@@ -1512,33 +1606,36 @@ $baseQuery = [
         let hideMessageTimer;
 
 
-
         forms.forEach(
-
             function(form) {
+
+                form.addEventListener(
+                    "click",
+                    function(event) {
+
+                        event.stopPropagation();
+
+                    }
+                );
 
 
                 form.addEventListener(
-
                     "submit",
-
                     function(event) {
 
-
-                        // Không submit form bình thường
-
                         event.preventDefault();
-
-
-                        // Không trigger click của product-card
 
                         event.stopPropagation();
 
 
-                        const formData =
-                            new FormData(
-                                form
+                        const submitButton =
+                            form.querySelector(
+                                'button[type="submit"]'
                             );
+
+
+                        const formData =
+                            new FormData(form);
 
 
                         formData.append(
@@ -1547,73 +1644,75 @@ $baseQuery = [
                         );
 
 
+                        if (submitButton) {
+
+                            submitButton.disabled =
+                                true;
+
+                            submitButton.textContent =
+                                "Đang thêm...";
+                        }
+
+
                         fetch(
-
-                                "cart.php",
-
-                                {
-
+                                "cart.php", {
                                     method: "POST",
-
-                                    body: formData
-
+                                    body: formData,
+                                    headers: {
+                                        "X-Requested-With": "XMLHttpRequest"
+                                    }
                                 }
-
                             )
 
-
                             .then(
-
                                 function(response) {
 
-
-                                    if (
-                                        !response.ok
-                                    ) {
+                                    if (!response.ok) {
 
                                         throw new Error(
-                                            "HTTP error " +
+                                            "HTTP error: " +
                                             response.status
                                         );
-
                                     }
 
 
                                     return response.json();
-
-
                                 }
-
                             )
 
-
                             .then(
-
                                 function(data) {
+
+                                    if (!data.success) {
+
+                                        throw new Error(
+                                            data.message ||
+                                            "Không thể thêm sản phẩm."
+                                        );
+                                    }
 
 
                                     if (
-                                        data.success
+                                        cartCountElement &&
+                                        data.cartCount !==
+                                        undefined
                                     ) {
 
-
-                                        // Update cart count
-
-                                        cartCount.textContent =
+                                        cartCountElement.textContent =
                                             data.cartCount;
+                                    }
 
 
-                                        // Show notification
+                                    if (successMessage) {
 
                                         successMessage.textContent =
-                                            data.message;
+                                            data.message ||
+                                            "Đã thêm sản phẩm vào giỏ hàng.";
 
 
-                                        successMessage
-                                            .classList
-                                            .add(
-                                                "show"
-                                            );
+                                        successMessage.classList.add(
+                                            "show"
+                                        );
 
 
                                         clearTimeout(
@@ -1623,9 +1722,7 @@ $baseQuery = [
 
                                         hideMessageTimer =
                                             setTimeout(
-
                                                 function() {
-
 
                                                     successMessage
                                                         .classList
@@ -1633,26 +1730,16 @@ $baseQuery = [
                                                             "show"
                                                         );
 
-
                                                 },
-
                                                 2500
-
                                             );
-
-
                                     }
 
-
                                 }
-
                             )
 
-
                             .catch(
-
                                 function(error) {
-
 
                                     console.error(
                                         "Add cart error:",
@@ -1660,31 +1747,65 @@ $baseQuery = [
                                     );
 
 
-                                }
+                                    if (successMessage) {
 
+                                        successMessage.textContent =
+                                            "Có lỗi xảy ra. Vui lòng thử lại.";
+
+
+                                        successMessage.classList.add(
+                                            "show"
+                                        );
+
+
+                                        clearTimeout(
+                                            hideMessageTimer
+                                        );
+
+
+                                        hideMessageTimer =
+                                            setTimeout(
+                                                function() {
+
+                                                    successMessage
+                                                        .classList
+                                                        .remove(
+                                                            "show"
+                                                        );
+
+                                                },
+                                                2500
+                                            );
+                                    }
+
+                                }
+                            )
+
+                            .finally(
+                                function() {
+
+                                    if (submitButton) {
+
+                                        submitButton.disabled =
+                                            false;
+
+                                        submitButton.textContent =
+                                            "🛒 Thêm vào giỏ hàng";
+                                    }
+
+                                }
                             );
 
-
                     }
-
                 );
 
-
             }
-
         );
-
 
 
         // =====================================
         // PRODUCT SCROLL ANIMATION
         // =====================================
-
-        const productCards =
-            document.querySelectorAll(
-                ".product-card"
-            );
-
 
         const productMain =
             document.querySelector(
@@ -1702,20 +1823,11 @@ $baseQuery = [
             "down";
 
 
-
-        // =====================================
-        // Detect Scroll Direction
-        // =====================================
-
         if (productMain) {
 
-
             productMain.addEventListener(
-
                 "scroll",
-
                 function() {
-
 
                     const currentScrollTop =
                         productMain.scrollTop;
@@ -1726,21 +1838,16 @@ $baseQuery = [
                         lastScrollTop
                     ) {
 
-
                         scrollDirection =
                             "down";
-
 
                     } else if (
                         currentScrollTop <
                         lastScrollTop
                     ) {
 
-
                         scrollDirection =
                             "up";
-
-
                     }
 
 
@@ -1750,36 +1857,26 @@ $baseQuery = [
                             0
                         );
 
-
+                }, {
+                    passive: true
                 }
-
             );
-
-
         }
 
 
-
-        // =====================================
-        // Intersection Observer
-        // =====================================
-
         if (
+            productMain &&
             productCards.length > 0 &&
-            productMain
+            "IntersectionObserver" in window
         ) {
-
 
             const productObserver =
                 new IntersectionObserver(
 
                     function(entries) {
 
-
                         entries.forEach(
-
                             function(entry) {
-
 
                                 const card =
                                     entry.target;
@@ -1789,96 +1886,71 @@ $baseQuery = [
                                     entry.isIntersecting
                                 ) {
 
-
                                     card.classList.remove(
                                         "scroll-up",
                                         "scroll-down"
                                     );
 
 
-                                    if (
+                                    card.classList.add(
                                         scrollDirection ===
-                                        "down"
-                                    ) {
-
-
-                                        card.classList.add(
-                                            "scroll-down"
-                                        );
-
-
-                                    } else {
-
-
-                                        card.classList.add(
-                                            "scroll-up"
-                                        );
-
-
-                                    }
+                                        "down" ?
+                                        "scroll-down" :
+                                        "scroll-up"
+                                    );
 
 
                                     requestAnimationFrame(
-
                                         function() {
-
 
                                             card.classList.add(
                                                 "show-animation"
                                             );
 
-
                                         }
-
                                     );
 
-
                                 } else {
-
 
                                     card.classList.remove(
                                         "show-animation"
                                     );
-
-
                                 }
 
-
                             }
-
                         );
-
 
                     },
 
                     {
-
                         root: productMain,
-
                         threshold: 0.12,
-
                         rootMargin: "0px 0px -30px 0px"
-
                     }
-
                 );
 
 
             productCards.forEach(
-
                 function(card) {
-
 
                     productObserver.observe(
                         card
                     );
 
-
                 }
-
             );
 
+        } else {
 
+            productCards.forEach(
+                function(card) {
+
+                    card.classList.add(
+                        "show-animation"
+                    );
+
+                }
+            );
         }
     </script>
 

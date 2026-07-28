@@ -1542,3 +1542,62 @@ body {
     }
 
 }
+
+/* =========================
+   Sale / Discount
+========================= */
+
+.product-image {
+    position: relative;
+}
+
+.sale-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 5;
+
+    padding: 6px 10px;
+    border-radius: 6px;
+
+    background-color: #e53935;
+    color: #ffffff;
+
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.product-price {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+
+    margin: 12px 0;
+}
+
+.original-price {
+    margin: 0;
+
+    color: #8a8a8a;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: line-through;
+}
+
+.sale-price {
+    margin: 0;
+
+    color: #e53935;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.normal-price {
+    margin: 0;
+
+    color: #e53935;
+    font-size: 20px;
+    font-weight: 700;
+}
