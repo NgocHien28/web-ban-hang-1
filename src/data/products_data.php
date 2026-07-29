@@ -6,6 +6,7 @@ $baseProducts = [
         "name" => "Laptop",
         "category" => "Laptop",
         "base_price" => 15000000,
+
         "description" =>
         "Laptop hiện đại, hiệu năng tốt, phù hợp cho học tập và làm việc.",
 
@@ -17,6 +18,7 @@ $baseProducts = [
         "name" => "Điện thoại",
         "category" => "Điện thoại",
         "base_price" => 8000000,
+
         "description" =>
         "Điện thoại thông minh với thiết kế hiện đại và nhiều tính năng tiện ích.",
 
@@ -28,6 +30,7 @@ $baseProducts = [
         "name" => "Tablet",
         "category" => "Tablet",
         "base_price" => 7000000,
+
         "description" =>
         "Máy tính bảng tiện lợi, phù hợp cho học tập, làm việc và giải trí.",
 
@@ -39,6 +42,7 @@ $baseProducts = [
         "name" => "Tai nghe",
         "category" => "Tai nghe",
         "base_price" => 1200000,
+
         "description" =>
         "Tai nghe không dây với chất lượng âm thanh tốt và thiết kế hiện đại.",
 
@@ -74,10 +78,55 @@ for (
     $version++
 ) {
 
+
+    // =========================
+    // Xác định mức khuyến mãi
+    // =========================
+
+    $discount = 0;
+
+
+    // Phiên bản chia hết cho 5
+    // giảm giá 20%
+
+    if ($version % 5 === 0) {
+
+        $discount = 20;
+    }
+
+
+    // Phiên bản chia hết cho 3
+    // giảm giá 10%
+
+    elseif ($version % 3 === 0) {
+
+        $discount = 10;
+    }
+
+
     foreach (
         $baseProducts
         as $baseProduct
     ) {
+
+
+        // =========================
+        // Tính giá gốc
+        // =========================
+
+        $price =
+            $baseProduct["base_price"]
+            +
+            (
+                ($version - 1)
+                *
+                200000
+            );
+
+
+        // =========================
+        // Thêm sản phẩm vào mảng
+        // =========================
 
         $products[] = [
 
@@ -93,23 +142,22 @@ for (
                 . $version,
 
 
-            // Danh mục
+            // Danh mục sản phẩm
             "category" =>
             $baseProduct["category"],
 
 
-            // Giá sản phẩm
+            // Giá gốc sản phẩm
             "price" =>
-            $baseProduct["base_price"]
-                +
-                (
-                    ($version - 1)
-                    *
-                    200000
-                ),
+            $price,
 
 
-            // Mô tả
+            // Phần trăm khuyến mãi
+            "discount" =>
+            $discount,
+
+
+            // Mô tả sản phẩm
             "description" =>
             $baseProduct["description"],
 

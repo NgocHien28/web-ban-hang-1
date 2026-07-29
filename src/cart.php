@@ -16,7 +16,7 @@ if (!isset($_SESSION["username"])) {
 
 
 // =========================
-// Tạo giỏ hàng nếu chưa có
+// Khởi tạo giỏ hàng
 // =========================
 
 if (!isset($_SESSION["cart"])) {
@@ -26,31 +26,100 @@ if (!isset($_SESSION["cart"])) {
 
 
 // =========================
-// Load danh sách 100 sản phẩm
+// Load dữ liệu sản phẩm
 // =========================
 
-$productsData =
-    require __DIR__
+$productsFile =
+    __DIR__
     . "/data/products_data.php";
+
+
+if (!file_exists($productsFile)) {
+
+    die("Không tìm thấy file dữ liệu sản phẩm: "
+        . htmlspecialchars($productsFile));
+}
+
+
+$allProducts =
+    require $productsFile;
+
+
+if (!is_array($allProducts)) {
+
+    die("File products_data.php phải trả về một mảng sản phẩm.");
+}
 
 
 // =========================
 // Chuyển danh sách sản phẩm
-// thành dạng:
-// $products[id] = product
+// thành mảng có key là ID
 // =========================
 
 $products = [];
 
 
-foreach ($productsData as $product) {
+foreach ($allProducts as $product) {
 
-    $products[$product["id"]] = $product;
+    $id =
+        (int) (
+            $product["id"]
+            ?? 0
+        );
+
+
+    if ($id <= 0) {
+
+        continue;
+    }
+
+
+    $products[$id] =
+        $product;
 }
 
 
 // =========================
-// Lấy action
+// Hàm tính giá sau khuyến mãi
+// =========================
+
+function calculateSalePrice(
+    int $price,
+    int $discount
+): int {
+
+    $discount =
+        max(
+            0,
+            min(
+                100,
+                $discount
+            )
+        );
+
+
+    if ($discount <= 0) {
+
+        return $price;
+    }
+
+
+    return (int) round(
+        $price
+            -
+            (
+                $price
+                *
+                $discount
+                /
+                100
+            )
+    );
+}
+
+
+// =========================
+// Nhận dữ liệu POST
 // =========================
 
 $action =
@@ -58,153 +127,196 @@ $action =
     ?? "";
 
 
-// =========================
-// Lấy product_id
-// =========================
-
 $productId =
     isset($_POST["product_id"])
     ? (int) $_POST["product_id"]
     : 0;
 
 
-// =========================
-// Kiểm tra request AJAX
-// =========================
-
 $isAjax =
     ($_POST["ajax"] ?? "")
     === "1";
 
 
+// =========================
+// Add / Increase / Decrease
+// =========================
 
-/* =========================
-   Thêm sản phẩm
-========================= */
+if (
+    $action === "add"
+    ||
+    $action === "increase"
+    ||
+    $action === "decrease"
+) {
 
-if ($action === "add") {
+
+    if (
+        isset(
+            $products[$productId]
+        )
+    ) {
 
 
-    // Kiểm tra sản phẩm có tồn tại không
+        // =========================
+        // Add hoặc Increase
+        // =========================
 
-    if (!isset($products[$productId])) {
+        if (
+            $action === "add"
+            ||
+            $action === "increase"
+        ) {
 
+
+            if (
+                isset(
+                    $_SESSION["cart"][$productId]
+                )
+            ) {
+
+                $_SESSION["cart"][$productId]["quantity"]++;
+            } else {
+
+                $_SESSION["cart"][$productId] = [
+
+                    "id" =>
+                    $productId,
+
+                    "quantity" =>
+                    1
+
+                ];
+            }
+        }
+
+
+        // =========================
+        // Decrease
+        // =========================
+
+        if (
+            $action === "decrease"
+        ) {
+
+
+            if (
+                isset(
+                    $_SESSION["cart"][$productId]
+                )
+            ) {
+
+                $_SESSION["cart"][$productId]["quantity"]--;
+
+
+                if (
+                    $_SESSION["cart"][$productId]["quantity"]
+                    <= 0
+                ) {
+
+                    unset(
+                        $_SESSION["cart"][$productId]
+                    );
+                }
+            }
+        }
+
+
+        // =========================
+        // Số lượng sản phẩm hiện tại
+        // =========================
+
+        $itemQuantity =
+            $_SESSION["cart"][$productId]["quantity"]
+            ?? 0;
+
+
+        // =========================
+        // Tổng số lượng giỏ hàng
+        // =========================
+
+        $cartCount = 0;
+
+
+        foreach (
+            $_SESSION["cart"]
+            as $item
+        ) {
+
+            $cartCount +=
+                (int) (
+                    $item["quantity"]
+                    ?? 0
+                );
+        }
+
+
+        // =========================
+        // AJAX response
+        // =========================
 
         if ($isAjax) {
 
             header(
-                "Content-Type: application/json; charset=utf-8"
+                "Content-Type: application/json; charset=UTF-8"
             );
 
 
-            echo json_encode([
+            echo json_encode(
+                [
 
-                "success" => false,
+                    "success" =>
+                    true,
 
-                "message" =>
-                "Không tìm thấy sản phẩm."
+                    "message" =>
+                    "Đã cập nhật giỏ hàng!",
 
-            ]);
+                    "cartCount" =>
+                    $cartCount,
+
+                    "itemQuantity" =>
+                    $itemQuantity
+
+                ],
+                JSON_UNESCAPED_UNICODE
+            );
 
 
             exit;
         }
-
-
-        header("Location: products.php");
-
-        exit;
     }
 
 
-
-    // =========================
-    // Nếu sản phẩm đã có
-    // thì tăng quantity
-    // =========================
-
-    if (
-        isset(
-            $_SESSION["cart"][$productId]
-        )
-    ) {
-
-
-        $_SESSION["cart"][$productId]["quantity"]++;
-    } else {
-
-
-        // =========================
-        // Nếu chưa có
-        // thì thêm mới
-        // =========================
-
-        $_SESSION["cart"][$productId] = [
-
-            "id" =>
-            $productId,
-
-            "quantity" =>
-            1
-
-        ];
-    }
-
-
-
-    // =========================
-    // Tính tổng số lượng
-    // =========================
-
-    $cartCount = 0;
-
-
-    foreach (
-        $_SESSION["cart"]
-        as $item
-    ) {
-
-
-        $cartCount +=
-            $item["quantity"];
-    }
-
-
-
-    // =========================
-    // Nếu gọi bằng AJAX
-    // từ products.php
-    // =========================
+    // AJAX nhưng sản phẩm không tồn tại
 
     if ($isAjax) {
 
-
         header(
-            "Content-Type: application/json; charset=utf-8"
+            "Content-Type: application/json; charset=UTF-8"
         );
 
 
-        echo json_encode([
+        http_response_code(404);
 
-            "success" =>
-            true,
 
-            "message" =>
-            "Thêm sản phẩm vào giỏ hàng thành công!",
+        echo json_encode(
+            [
 
-            "cartCount" =>
-            $cartCount
+                "success" =>
+                false,
 
-        ]);
+                "message" =>
+                "Không tìm thấy sản phẩm."
+
+            ],
+            JSON_UNESCAPED_UNICODE
+        );
 
 
         exit;
     }
 
 
-
-    // Nếu không phải AJAX
-
     header(
         "Location: cart.php"
     );
@@ -213,82 +325,9 @@ if ($action === "add") {
 }
 
 
-
-/* =========================
-   Tăng số lượng
-========================= */
-
-if ($action === "increase") {
-
-
-    if (
-        isset(
-            $_SESSION["cart"][$productId]
-        )
-    ) {
-
-
-        $_SESSION["cart"][$productId]["quantity"]++;
-    }
-
-
-    header(
-        "Location: cart.php"
-    );
-
-    exit;
-}
-
-
-
-/* =========================
-   Giảm số lượng
-========================= */
-
-if ($action === "decrease") {
-
-
-    if (
-        isset(
-            $_SESSION["cart"][$productId]
-        )
-    ) {
-
-
-        $_SESSION["cart"][$productId]["quantity"]--;
-
-
-
-        // =========================
-        // Nếu quantity <= 0
-        // thì xóa sản phẩm
-        // =========================
-
-        if (
-            $_SESSION["cart"][$productId]["quantity"]
-            <= 0
-        ) {
-
-
-            unset(
-                $_SESSION["cart"][$productId]
-            );
-        }
-    }
-
-
-    header(
-        "Location: cart.php"
-    );
-
-    exit;
-}
-
-
-
-/* =========================
-   Xóa một sản phẩm
-========================= */
+// =========================
+// Remove
+// =========================
 
 if ($action === "remove") {
 
@@ -298,7 +337,6 @@ if ($action === "remove") {
             $_SESSION["cart"][$productId]
         )
     ) {
-
 
         unset(
             $_SESSION["cart"][$productId]
@@ -314,16 +352,13 @@ if ($action === "remove") {
 }
 
 
-
-/* =========================
-   Xóa toàn bộ giỏ hàng
-========================= */
+// =========================
+// Clear
+// =========================
 
 if ($action === "clear") {
 
-
-    $_SESSION["cart"] =
-        [];
+    $_SESSION["cart"] = [];
 
 
     header(
@@ -334,10 +369,32 @@ if ($action === "clear") {
 }
 
 
+// =========================
+// Xóa sản phẩm không còn tồn tại
+// trong products_data.php
+// =========================
 
-/* =========================
-   Tính tổng số lượng
-========================= */
+foreach (
+    $_SESSION["cart"]
+    as $id => $item
+) {
+
+    if (
+        !isset(
+            $products[$id]
+        )
+    ) {
+
+        unset(
+            $_SESSION["cart"][$id]
+        );
+    }
+}
+
+
+// =========================
+// Cart Count
+// =========================
 
 $cartCount = 0;
 
@@ -347,16 +404,21 @@ foreach (
     as $item
 ) {
 
-
     $cartCount +=
-        $item["quantity"];
+        (int) (
+            $item["quantity"]
+            ?? 0
+        );
 }
 
 
+// =========================
+// Tổng tiền
+// =========================
 
-/* =========================
-   Tính tổng tiền
-========================= */
+$totalOriginalPrice = 0;
+
+$totalDiscountAmount = 0;
 
 $totalPrice = 0;
 
@@ -366,30 +428,80 @@ foreach (
     as $item
 ) {
 
-
     $id =
-        $item["id"];
+        (int) (
+            $item["id"]
+            ?? 0
+        );
 
 
-    // Kiểm tra sản phẩm
-    // còn tồn tại trong data
+    $quantity =
+        (int) (
+            $item["quantity"]
+            ?? 0
+        );
+
 
     if (
-        isset(
+        !isset(
             $products[$id]
         )
     ) {
 
-
-        $totalPrice +=
-
-            $products[$id]["price"]
-
-            *
-
-            $item["quantity"];
+        continue;
     }
+
+
+    $product =
+        $products[$id];
+
+
+    $originalPrice =
+        (int) (
+            $product["price"]
+            ?? 0
+        );
+
+
+    $discount =
+        (int) (
+            $product["discount"]
+            ?? 0
+        );
+
+
+    $salePrice =
+        calculateSalePrice(
+            $originalPrice,
+            $discount
+        );
+
+
+    $originalSubtotal =
+        $originalPrice
+        *
+        $quantity;
+
+
+    $saleSubtotal =
+        $salePrice
+        *
+        $quantity;
+
+
+    $totalOriginalPrice +=
+        $originalSubtotal;
+
+
+    $totalPrice +=
+        $saleSubtotal;
 }
+
+
+$totalDiscountAmount =
+    $totalOriginalPrice
+    -
+    $totalPrice;
 
 ?>
 
@@ -397,33 +509,26 @@ foreach (
 
 <html lang="vi">
 
-
 <head>
 
-
     <meta charset="UTF-8">
-
 
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0">
 
-
     <title>
         Giỏ hàng
     </title>
-
 
     <link
         rel="stylesheet"
         href="./css/cart.css?v=2">
 
-
 </head>
 
 
 <body>
-
 
 
     <!-- =========================
@@ -432,21 +537,17 @@ foreach (
 
     <header class="header">
 
-
-        <div
-            class="container header-container">
+        <div class="container header-container">
 
 
-            <div class="logo">
-
+            <a
+                href="products.php"
+                class="logo">
                 MyShop
-
-            </div>
-
+            </a>
 
 
             <nav class="nav">
-
 
                 <a href="products.php">
 
@@ -455,49 +556,36 @@ foreach (
                 </a>
 
 
-
                 <a
                     href="cart.php"
                     class="active">
 
-
                     Giỏ hàng
 
-
                     <span class="cart-count">
-
 
                         <?php
                         echo $cartCount;
                         ?>
 
-
                     </span>
 
-
                 </a>
-
 
 
                 <a
                     href="logout.php"
                     class="logout">
 
-
                     Đăng xuất
-
 
                 </a>
 
-
             </nav>
-
 
         </div>
 
-
     </header>
-
 
 
     <!-- =========================
@@ -507,133 +595,78 @@ foreach (
     <main class="container">
 
 
-
-        <!-- =========================
-     Page Header
-========================= -->
-
         <section class="page-header">
 
+            <h1>
+                Giỏ hàng của bạn
+            </h1>
 
-            <div>
-
-
-                <h1>
-
-                    Giỏ hàng của bạn
-
-                </h1>
-
-
-                <p>
-
-                    Kiểm tra và cập nhật sản phẩm trong giỏ hàng.
-
-                </p>
-
-
-            </div>
-
+            <p>
+                Kiểm tra và cập nhật sản phẩm trong giỏ hàng.
+            </p>
 
         </section>
 
 
-
-        <!-- =========================
-     Kiểm tra giỏ hàng trống
-========================= -->
-
-        <?php
-
-        if (
+        <?php if (
             empty($_SESSION["cart"])
-        ):
-
-        ?>
+        ): ?>
 
 
-            <!-- =========================
-     Empty Cart
-========================= -->
+            <!-- Empty Cart -->
 
             <div class="empty-cart">
 
-
                 <div class="empty-icon">
-
                     🛒
-
                 </div>
 
-
                 <h2>
-
                     Giỏ hàng của bạn đang trống
-
                 </h2>
 
-
                 <p>
-
                     Hãy thêm sản phẩm mà bạn yêu thích vào giỏ hàng.
-
                 </p>
-
 
                 <a
                     href="products.php"
                     class="continue-shopping">
-
-
                     Tiếp tục mua sắm
-
-
                 </a>
 
-
             </div>
-
 
 
         <?php else: ?>
 
 
-
-            <!-- =========================
-     Cart Layout
-========================= -->
-
             <div class="cart-layout">
 
 
-
                 <!-- =========================
-     Danh sách sản phẩm
-========================= -->
+                 Cart List
+            ========================= -->
 
                 <section class="cart-list">
 
 
-
                     <?php
-
                     foreach (
                         $_SESSION["cart"]
                         as $item
                     ):
-
                     ?>
 
 
                         <?php
 
-
                         $id =
-                            $item["id"];
+                            (int) (
+                                $item["id"]
+                                ?? 0
+                            );
 
-
-                        // Nếu sản phẩm không tồn tại
-                        // thì bỏ qua
 
                         if (
                             !isset(
@@ -650,138 +683,204 @@ foreach (
 
 
                         $quantity =
-                            $item["quantity"];
+                            (int) (
+                                $item["quantity"]
+                                ?? 0
+                            );
+
+
+                        $productName =
+                            (string) (
+                                $product["name"]
+                                ?? "Sản phẩm"
+                            );
+
+
+                        $productImage =
+                            (string) (
+                                $product["image"]
+                                ?? ""
+                            );
+
+
+                        $originalPrice =
+                            (int) (
+                                $product["price"]
+                                ?? 0
+                            );
+
+
+                        $discount =
+                            (int) (
+                                $product["discount"]
+                                ?? 0
+                            );
+
+
+                        $discount =
+                            max(
+                                0,
+                                min(
+                                    100,
+                                    $discount
+                                )
+                            );
+
+
+                        $salePrice =
+                            calculateSalePrice(
+                                $originalPrice,
+                                $discount
+                            );
+
+
+                        $originalSubtotal =
+                            $originalPrice
+                            *
+                            $quantity;
 
 
                         $subtotal =
-
-                            $product["price"]
-
+                            $salePrice
                             *
-
                             $quantity;
-
 
                         ?>
 
 
-
-                        <div class="cart-item">
-
+                        <article class="cart-item">
 
 
-                            <!-- =========================
-     Product Image
-========================= -->
+                            <!-- Image -->
 
                             <div class="cart-image">
 
+                                <?php if (
+                                    $discount > 0
+                                ): ?>
+
+                                    <span class="cart-sale-badge">
+
+                                        -<?php
+                                            echo $discount;
+                                            ?>%
+
+                                    </span>
+
+                                <?php endif; ?>
+
 
                                 <img
-
                                     src="<?php
                                             echo htmlspecialchars(
-                                                $product["image"]
+                                                $productImage
                                             );
                                             ?>"
-
                                     alt="<?php
                                             echo htmlspecialchars(
-                                                $product["name"]
+                                                $productName
                                             );
-                                            ?>">
-
+                                            ?>"
+                                    onerror="
+                                    this.onerror = null;
+                                    this.src =
+                                    'https://placehold.co/300x300/f3f4f6/64748b?text=Khong+co+hinh';
+                                ">
 
                             </div>
 
 
-
-                            <!-- =========================
-     Product Info
-========================= -->
+                            <!-- Info -->
 
                             <div class="cart-info">
 
 
                                 <h2>
 
-
                                     <?php
                                     echo htmlspecialchars(
-                                        $product["name"]
+                                        $productName
                                     );
                                     ?>
-
 
                                 </h2>
 
 
+                                <!-- Product Price -->
 
-                                <?php if (
-                                    isset(
-                                        $product["category"]
-                                    )
-                                ): ?>
+                                <div class="cart-product-price">
 
 
-                                    <p class="product-category">
+                                    <?php if (
+                                        $discount > 0
+                                    ): ?>
 
 
-                                        <?php
-                                        echo htmlspecialchars(
-                                            $product["category"]
-                                        );
-                                        ?>
+                                        <span class="cart-original-price">
+
+                                            <?php
+                                            echo number_format(
+                                                $originalPrice,
+                                                0,
+                                                ",",
+                                                "."
+                                            );
+                                            ?>
+
+                                            đ
+
+                                        </span>
 
 
-                                    </p>
+                                        <span class="cart-sale-price">
+
+                                            <?php
+                                            echo number_format(
+                                                $salePrice,
+                                                0,
+                                                ",",
+                                                "."
+                                            );
+                                            ?>
+
+                                            đ
+
+                                        </span>
 
 
-                                <?php endif; ?>
+                                    <?php else: ?>
 
 
+                                        <span class="cart-normal-price">
 
-                                <p class="product-price">
+                                            <?php
+                                            echo number_format(
+                                                $originalPrice,
+                                                0,
+                                                ",",
+                                                "."
+                                            );
+                                            ?>
 
+                                            đ
 
-                                    <?php
-
-                                    echo number_format(
-
-                                        $product["price"],
-
-                                        0,
-
-                                        ",",
-
-                                        "."
-
-                                    );
-
-                                    ?>
+                                        </span>
 
 
-                                    đ
+                                    <?php endif; ?>
 
 
-                                </p>
+                                </div>
 
 
-
-                                <!-- =========================
-     Quantity Control
-========================= -->
+                                <!-- Quantity -->
 
                                 <div class="quantity-control">
 
 
-
-                                    <!-- Decrease -->
-
                                     <form
                                         action="cart.php"
                                         method="post">
-
 
                                         <input
                                             type="hidden"
@@ -792,44 +891,33 @@ foreach (
                                         <input
                                             type="hidden"
                                             name="product_id"
-                                            value="<?php echo $id; ?>">
+                                            value="<?php
+                                                    echo $id;
+                                                    ?>">
 
 
                                         <button
                                             type="submit"
-                                            class="quantity-button">
-
-
+                                            class="quantity-button"
+                                            aria-label="Giảm số lượng">
                                             −
-
-
                                         </button>
-
 
                                     </form>
 
 
-
-                                    <!-- Quantity -->
-
                                     <span class="quantity">
-
 
                                         <?php
                                         echo $quantity;
                                         ?>
 
-
                                     </span>
 
-
-
-                                    <!-- Increase -->
 
                                     <form
                                         action="cart.php"
                                         method="post">
-
 
                                         <input
                                             type="hidden"
@@ -840,71 +928,71 @@ foreach (
                                         <input
                                             type="hidden"
                                             name="product_id"
-                                            value="<?php echo $id; ?>">
+                                            value="<?php
+                                                    echo $id;
+                                                    ?>">
 
 
                                         <button
                                             type="submit"
-                                            class="quantity-button">
-
-
+                                            class="quantity-button"
+                                            aria-label="Tăng số lượng">
                                             +
-
-
                                         </button>
-
 
                                     </form>
 
-
                                 </div>
-
 
                             </div>
 
 
-
-                            <!-- =========================
-     Right
-========================= -->
+                            <!-- Right -->
 
                             <div class="cart-right">
 
 
+                                <?php if (
+                                    $discount > 0
+                                ): ?>
+
+                                    <p class="original-subtotal">
+
+                                        <?php
+                                        echo number_format(
+                                            $originalSubtotal,
+                                            0,
+                                            ",",
+                                            "."
+                                        );
+                                        ?>
+
+                                        đ
+
+                                    </p>
+
+                                <?php endif; ?>
+
 
                                 <p class="subtotal">
 
-
                                     <?php
-
                                     echo number_format(
-
                                         $subtotal,
-
                                         0,
-
                                         ",",
-
                                         "."
-
                                     );
-
                                     ?>
 
-
                                     đ
-
 
                                 </p>
 
 
-
-                                <!-- Remove -->
-
                                 <form
                                     action="cart.php"
                                     method="post">
-
 
                                     <input
                                         type="hidden"
@@ -915,135 +1003,145 @@ foreach (
                                     <input
                                         type="hidden"
                                         name="product_id"
-                                        value="<?php echo $id; ?>">
+                                        value="<?php
+                                                echo $id;
+                                                ?>">
 
 
                                     <button
                                         type="submit"
                                         class="remove-button">
-
-
                                         Xóa
-
-
                                     </button>
-
 
                                 </form>
 
-
                             </div>
 
-
-                        </div>
-
+                        </article>
 
 
                     <?php endforeach; ?>
 
 
-
                 </section>
 
 
-
                 <!-- =========================
-     Cart Summary
-========================= -->
+                 Cart Summary
+            ========================= -->
 
                 <aside class="cart-summary">
 
 
-
                     <h2>
-
                         Tổng giỏ hàng
-
                     </h2>
-
 
 
                     <div class="summary-row">
 
-
                         <span>
-
                             Tổng sản phẩm
-
                         </span>
 
-
                         <span>
-
-
                             <?php
                             echo $cartCount;
                             ?>
-
-
                         </span>
-
 
                     </div>
 
+
+                    <div class="summary-row">
+
+                        <span>
+                            Tổng giá gốc
+                        </span>
+
+                        <span>
+
+                            <?php
+                            echo number_format(
+                                $totalOriginalPrice,
+                                0,
+                                ",",
+                                "."
+                            );
+                            ?>
+
+                            đ
+
+                        </span>
+
+                    </div>
+
+
+                    <?php if (
+                        $totalDiscountAmount > 0
+                    ): ?>
+
+                        <div class="summary-row discount-row">
+
+                            <span>
+                                Khuyến mãi
+                            </span>
+
+                            <span>
+
+                                -<?php
+                                    echo number_format(
+                                        $totalDiscountAmount,
+                                        0,
+                                        ",",
+                                        "."
+                                    );
+                                    ?>
+
+                                đ
+
+                            </span>
+
+                        </div>
+
+                    <?php endif; ?>
 
 
                     <div class="summary-row total">
 
-
                         <span>
-
-                            Tổng tiền
-
+                            Tổng thanh toán
                         </span>
 
-
                         <span>
 
-
                             <?php
-
                             echo number_format(
-
                                 $totalPrice,
-
                                 0,
-
                                 ",",
-
                                 "."
-
                             );
-
                             ?>
-
 
                             đ
 
-
                         </span>
 
-
                     </div>
-
 
 
                     <a
                         href="products.php"
                         class="continue-button">
-
-
                         Tiếp tục mua sắm
-
-
                     </a>
-
 
 
                     <form
                         action="cart.php"
                         method="post">
-
 
                         <input
                             type="hidden"
@@ -1054,22 +1152,15 @@ foreach (
                         <button
                             type="submit"
                             class="clear-button">
-
-
                             Xóa toàn bộ giỏ hàng
-
-
                         </button>
 
-
                     </form>
-
 
                 </aside>
 
 
             </div>
-
 
 
         <?php endif; ?>
@@ -1079,6 +1170,5 @@ foreach (
 
 
 </body>
-
 
 </html>
